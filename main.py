@@ -1,7 +1,6 @@
 import sqlite3
 import uuid
-import datetime
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException
 
 app = FastAPI()
 
@@ -12,27 +11,18 @@ conn.execute("CREATE TABLE IF NOT EXISTS claims (id TEXT, pid TEXT, prov TEXT, i
 conn.close()
 
 @app.post("/add")
-async def add_claim(req: Request):
-    data = await req.json()
-    
-    patient = data.get("patient_id")
-    provider = data.get("provider_id")
-    code = data.get("icd")
-    amount = data.get("amount")
-
+def add_claim(patient_id: str, provider_id: str, icd: str, amount: float):
     if amount > 10000:
         s = "Needs Review"
     else:
         s = "Approved"
 
     my_id = "ID-" + str(uuid.uuid4())[:8]
-
-    print("Saving claim for patient: " + str(patient))
     
     conn = sqlite3.connect(db_file)
     cur = conn.cursor()
     cur.execute("INSERT INTO claims VALUES (?, ?, ?, ?, ?, ?)", 
-                (my_id, patient, provider, code, amount, s))
+                (my_id, patient_id, provider_id, icd, amount, s))
     conn.commit()
     conn.close()
 
