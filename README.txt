@@ -1,53 +1,38 @@
-# Ginja AI - Backend Engineer Case Study (Claims Validation)
+Markdown
+# Ginga Claims Validation API
 
-## Overview
-This is a high-performance REST API built with **FastAPI** to automate the validation of health insurance claims. The system ensures that members are active, claims fall within benefit limits, and potential fraud is flagged.
+Hi! This is my submission for the Backend Engineer Case Study. I built a REST API that helps automate how insurance claims are checked and stored.
 
-## Architecture Decisions
-- **FastAPI**: Chosen for its native support for asynchronous programming and automatic OpenAPI (Swagger) documentation.
-- **SQLite**: Used for persistence to meet the "Relational Database" requirement without requiring the reviewer to set up a complex database server.
-- **Pydantic**: Used for strict data validation and type safety for incoming JSON payloads.
-- **Logging**: Integrated Python's standard `logging` library to track claim processing and errors in real-time (Bonus Point).
+## How it Works
+When a claim is submitted, the code checks three main things:
+1. **Member Status**: Is the person actually covered? (Checks a list of active members).
+2. **Amount Limit**: Is the claim over $40,000? If so, it gets flagged as "Partial."
+3. **Fraud Check**: Is the price way higher than normal? (Checks if the amount is more than 2x the average for that procedure).
 
-## How to Run Locally
-1. **Activate the environment**: 
-   - Windows: `venv\Scripts\activate`
-   - Mac/Linux: `source venv/bin/activate`
-2. **Install dependencies**: `pip install -r requirements.txt`
-3. **Start the server**: `uvicorn main:app --reload`
-4. **Interactive Docs**: Open your browser to `http://127.0.0.1:8000/docs`
+## Tech I Used
+- **Python & FastAPI**: For building the web server and the endpoints.
+- **SQLite**: I used a SQL database to make sure the claims are saved properly in a table.
+- **UUID**: To give every claim a unique ID number.
 
-## Sample API Requests (curl)
-You can test the API using the following commands in your terminal:
+## How to Run it on Your Computer
 
-**Submit a Claim (POST):**
-```bash
-curl -X 'POST' \
-  '[http://127.0.0.1:8000/claims](http://127.0.0.1:8000/claims)' \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "member_id": "M123",
-  "provider_id": "H456",
-  "diagnosis_code": "D001",
-  "procedure_code": "P001",
-  "claim_amount": 5000
-}'
-# --- GET CLAIM STATUS ---
-@app.get("/claims/{claim_id}")
-async def get_claim(claim_id: str):
-    # 1. Connect to our SQLite database
-    conn = sqlite3.connect("claims.db")
-    cursor = conn.cursor()
-    
-    # 2. Search for the specific claim_id
-    cursor.execute("SELECT claim_id, status FROM claims WHERE claim_id = ?", (claim_id,))
-    row = cursor.fetchone()
-    conn.close()
+1. **Activate the environment**:
+   - On Windows: `venv\Scripts\activate`
+   - On Mac/Linux: `source venv/bin/activate`
 
-    # 3. If the ID doesn't exist in the database, send a 404 error
-    if not row:
-        logger.warning(f"Claim lookup failed: {claim_id} not found")
-        raise HTTPException(status_code=404, detail="Claim not found")
-    
-    # 4. Return the data found
-    return {"claim_id": row[0], "status": row[1]}
+2. **Install what's needed**:
+   ```bash
+   pip install -r requirements.txt
+Start the server:
+
+Bash
+uvicorn main:app --reload
+How to Test
+The easiest way to test is using the built-in documentation page at:
+http://127.0.0.1:8000/docs
+
+Use POST /submit_claim to add a new claim.
+
+Use GET /get_claim/{id} to look up a claim by its ID.
+
+Use GET /check just to see if the server is running.
