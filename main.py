@@ -2,48 +2,76 @@ import sqlite3
 import uuid
 from fastapi import FastAPI, HTTPException
 
-app = FastAPI()
+app = FastAPI(title="Ginga Claims API")
 
-db_file = "claims.db"
-
-conn = sqlite3.connect(db_file)
-conn.execute("CREATE TABLE IF NOT EXISTS claims (id TEXT, pid TEXT, prov TEXT, icd TEXT, amt REAL, status TEXT)")
-conn.close()
-
-@app.post("/add")
-def add_claim(patient_id: str, provider_id: str, icd: str, amount: float):
-    if amount > 10000:
-        s = "Needs Review"
-    else:
-        s = "Approved"
-
-    my_id = "ID-" + str(uuid.uuid4())[:8]
-    
-    conn = sqlite3.connect(db_file)
-    cur = conn.cursor()
-    cur.execute("INSERT INTO claims VALUES (?, ?, ?, ?, ?, ?)", 
-                (my_id, patient_id, provider_id, icd, amount, s))
+def setup():
+    conn = sqlite3.connect('claims.db')
+    curr = conn.cursor()
+    curr.execute('CREATE TABLE IF NOT EXISTS claims (claim_id TEXT, member_id TEXT, provider_id TEXT, diag_code TEXT, proc_code TEXT, amount REAL, status TEXT)')
     conn.commit()
     conn.close()
 
-    return {"id": my_id, "status": s}
+setup()
 
-@app.get("/get/{id}")
-def get_info(id: str):
-    conn = sqlite3.connect(db_file)
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM claims WHERE id = ?", (id,))
-    row = cur.fetchone()
-    conn.close()
+members = {"M123": True, "M456": False}
+costs = {"P001": 20000.0, "P002": 5000.0}
 
-    if row == None:
-        return {"error": "not found"}
+@app.post("/submit_claim")
+async def post_claim(data: dict):
+    try:
+        m_id = data.get("member_id").upper()
+        p_id = data.get("provider_id").upper()
+        proc = data.get("procedure_code").upper()
+        amt = float(data.get("claim_amount"))
+        diag = data.get("diagnosis_code")
+    except (AttributeError, ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid data format")
+
+    if m_id not in members:
+        raise HTTPException(status_code=404, detail="Member not found")
+    
+    if proc not in costs:
+        raise HTTPException(status_code=404, detail="Procedure code not found")
+
+    status = "Approved"
+    
+    if members[m_id] == False:
+        status = "Rejected"
+    elif amt > 40000:
+        status = "Partial"
+    elif amt > (costs[proc] * 2):
+        status = "Partial"
+
+    cid = "C-" + str(uuid.uuid4()).upper()[:6]
+
+    try:
+        with sqlite3.connect('claims.db') as db:
+            cursor = db.cursor()
+            cursor.execute("INSERT INTO claims VALUES (?, ?, ?, ?, ?, ?, ?)", 
+                           (cid, m_id, p_id, diag, proc, amt, status))
+            db.commit()
+    except Exception:
+        raise HTTPException(status_code=500, detail="Database error")
 
     return {
-        "claim_id": row[0],
-        "patient": row[1],
-        "provider": row[2],
-        "code": row[3],
-        "amount": row[4],
-        "status": row[5]
+        "claim_id": cid,
+        "status": status,
+        "amount": amt
     }
+
+@app.get("/get_claim/{id}")
+async def fetch_claim(id: str):
+    with sqlite3.connect('claims.db') as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM claims WHERE claim_id = ?", (id,))
+        item = cursor.fetchone()
+    
+    if item is None:
+        raise HTTPException(status_code=404, detail="Claim ID not found")
+        
+    return dict(item)
+
+@app.get("/check")
+def check():
+    return {"status": "ok"}
